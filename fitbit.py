@@ -10,10 +10,16 @@ from oauthlib.oauth2 import MobileApplicationClient # BackendApplicationClient
 import pandas as pd
 from pandas import Timestamp as Ts
 from requests_oauthlib import OAuth2Session
-# TODO: refresh tokens
 
 import pdb
 DEBUG = True
+
+# TODO: refresh tokens
+# TODO: fix cache merging
+
+# TODO: clean data (remove naps, etc)
+# TODO: paginate requests
+
 
 
 

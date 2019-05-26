@@ -8,8 +8,19 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-class Sheets:
-    def __init__(self):
+
+# TODO: google token length
+# TODO: parse drug log
+
+LOG = "1IkWwtBNjwvoemWm9pdAO3Ni8sYvhRg_V-B5AHgpu9-8"
+
+
+class Sheet:
+    def __init__(self, sheet_id: Optional[str]=None):
+        if sheet_id is None:
+            self.sheet_id = LOG
+        else:
+            self.sheet_id = sheet_id
         self.spreadsheets = None
         try:
             self.cache = pd.read_csv("log.csv")
@@ -43,11 +54,11 @@ class Sheets:
         service = build("sheets", "v4", credentials=creds)
         self.spreadsheets = service.spreadsheets()
 
-    def get_data(self, sheet_id: str, refresh: Optional[bool]=False) -> pd.DataFrame:
+    def get_data(self, refresh: Optional[bool]=False) -> pd.DataFrame:
         if self.cache.empty or refresh:
             self.auth()
             result = pd.DataFrame(self.spreadsheets.values().get(
-                spreadsheetId=sheet_id,
+                spreadsheetId=self.sheet_id,
                 range="log!A1:B2000"
             ).execute()["values"])
             if not result.empty:
