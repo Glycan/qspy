@@ -4,6 +4,17 @@ import fitbit
 import sheets
 
 
+# so now the idea is to just take whatever the simplest thing is and write up something for the modafinil data....
+# which come to think of it i don't actually have
+#
+#but you are supposed to write out a basic structure..
+# read modafinil binary data
+# read sleep data 
+# read log and find last "sleep" for each day
+# read fitbit data and find first sleep minute
+# new column, sleep onset? 
+
+
 # my idea in this document is to sketch out how i might want to use
 # the code that I'm trying to write, and play with a few different ways of
 # arranging things to figure out which one makes more sense,

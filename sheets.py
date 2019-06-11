@@ -23,7 +23,7 @@ class Sheet:
             self.sheet_id = sheet_id
         self.spreadsheets = None
         try:
-            self.cache = pd.read_csv("log.csv")
+            self.cache = pd.read_csv("log.csv", converters={"ts": pd.Timestamp}, index_col="ts")
         except FileNotFoundError:
             self.cache = pd.DataFrame()
 
@@ -54,18 +54,28 @@ class Sheet:
         service = build("sheets", "v4", credentials=creds)
         self.spreadsheets = service.spreadsheets()
 
+    def process_data(self, data: list) -> pd.DataFrame:
+        scratch = pd.DataFrame(data)
+        ts = pd.to_datetime(scratch[0]) # todo: check what columns google returns 
+        #df = pd.DataFrame({"content": scratch[1], "ts": ts}, index=ts)
+        # don't understand why this ends up being full of NaN/NaT -- do they not have the same indexes?
+        df = pd.DataFrame()
+        df["content"] = scratch["content"]
+        df.index = ts
+        return df
+       
     def get_data(self, refresh: Optional[bool]=False) -> pd.DataFrame:
         if self.cache.empty or refresh:
             self.auth()
-            result = pd.DataFrame(self.spreadsheets.values().get(
+            result = self.spreadsheets.values().get(
                 spreadsheetId=self.sheet_id,
                 range="log!A1:B2000"
-            ).execute()["values"])
+            ).execute()["values"]
             if not result.empty:
-                self.cache = result
+                self.cache = self.process_data(result)
                 self.cache.to_csv("log.csv")
         return self.cache
 
-sheets = Sheets()
+sheets = Sheet()
 get_data = sheets.get_data
 

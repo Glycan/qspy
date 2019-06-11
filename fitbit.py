@@ -107,7 +107,7 @@ class Fitbit:
         output.index = pd.to_datetime(output.date)
         return output
 
-    def fetch_range(self, start_date, stop_date):
+    def fetch_range(self, start_date, stop_date, raw=False):
         response = self.session.get(
             "https://api.fitbit.com/1.2/user/-/sleep/date/{}/{}.json".format(
                 start_date,
@@ -116,11 +116,14 @@ class Fitbit:
         ) # doesn't include the last
         if not response.ok:
             print(response.json())
-        return self.scrape_data(response.json()["sleep"])
+        result = response.json()["sleep"]
+        if raw:
+            return result
+        else:
+            return self.scrape_data(result)           
 
-    def fetch_range(self, st, sto):
-        return pd.DataFrame([], columns=self.header)
-
+#    def fetch_range(self, st, sto):
+#        return pd.DataFrame([], columns=self.header)
 
     def get_data(self, start, stop):
         requested_days = pd.date_range(start, stop)
