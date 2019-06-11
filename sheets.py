@@ -14,6 +14,9 @@ from google.auth.transport.requests import Request
 
 LOG = "1IkWwtBNjwvoemWm9pdAO3Ni8sYvhRg_V-B5AHgpu9-8"
 
+def read_log(fname):
+    return pd.read_csv(fname, converters={"ts": pd.Timestamp}, index_col="ts")
+
 
 class Sheet:
     def __init__(self, sheet_id: Optional[str]=None):
@@ -23,7 +26,7 @@ class Sheet:
             self.sheet_id = sheet_id
         self.spreadsheets = None
         try:
-            self.cache = pd.read_csv("log.csv", converters={"ts": pd.Timestamp}, index_col="ts")
+            self.cache = read_log("log.csv")
         except FileNotFoundError:
             self.cache = pd.DataFrame()
 
