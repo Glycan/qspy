@@ -119,8 +119,7 @@ class Fitbit:
         result = response.json()["sleep"]
         if raw:
             return result
-        else:
-            return self.scrape_data(result)           
+        return self.scrape_data(result)           
 
 #    def fetch_range(self, st, sto):
 #        return pd.DataFrame([], columns=self.header)
