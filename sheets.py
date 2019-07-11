@@ -1,8 +1,8 @@
 import json
 import pickle
 import os.path
-from typing import Optional
 from datetime import date, datetime
+from typing import Optional, Any
 import pandas as pd
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -14,23 +14,23 @@ from google.auth.transport.requests import Request
 
 LOG = "1IkWwtBNjwvoemWm9pdAO3Ni8sYvhRg_V-B5AHgpu9-8"
 
-def read_log(fname):
+def read_log(fname: str) -> pd.DataFrame:
     return pd.read_csv(fname, converters={"ts": pd.Timestamp}, index_col="ts")
 
 
 class Sheet:
-    def __init__(self, sheet_id: Optional[str]=None):
-        if sheet_id is None:
+    def __init__(self, sheet_id: str=""):
+        if sheet_id == "":
             self.sheet_id = LOG
         else:
             self.sheet_id = sheet_id
-        self.spreadsheets = None
         try:
             self.cache = read_log("log.csv")
         except FileNotFoundError:
             self.cache = pd.DataFrame()
+        self.spreadsheets: Any = None
 
-    def auth(self):
+    def auth(self) -> None:
         if self.spreadsheets is not None:
             return
         creds = None
