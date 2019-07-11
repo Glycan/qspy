@@ -5,3 +5,7 @@ log.csv.bkp
 sleep.csv
 sleep.csv.bkp
 .fitbit-token
+.mypy_cache/
+.qs.py.kak.cRgBoH
+__pycache__/
+modafinil-notes
