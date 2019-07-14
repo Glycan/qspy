@@ -1,9 +1,14 @@
 from pdb import pm
+from warnings import filterwarnings
 import pandas as pd
+from typeguard import TypeChecker, TypeWarning
 import fitbit
-import sheets
-#sleep = fitbit.get_data("2019-04-01", "2019-05-01")
-#sleep = fitbit.get_data("2019-04-01", "2019-04-17")
+#import sheets
+#
+filterwarnings("always", category=TypeWarning)
+if 1: #with TypeChecker(["fitbit"]):
+    sleep = fitbit.get_data("2019-04-01", "2019-05-01")
+    sleep = fitbit.get_data("2019-04-01", "2019-04-17")
 
 
 # I'm going to do this is all in an unorganized way right now and make a better layout later 
@@ -28,5 +33,5 @@ def test_find_sleep_times():
     assert (find_sleep_times(test_data) == expected).all()
 
 
-log = sheets.get_data()
+#log = sheets.get_data()
 

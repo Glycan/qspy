@@ -4,9 +4,6 @@ import os.path
 from datetime import date, datetime
 from typing import Optional, Any
 import pandas as pd
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 
 
 # TODO: google token length
@@ -33,6 +30,9 @@ class Sheet:
     def auth(self) -> None:
         if self.spreadsheets is not None:
             return
+        from googleapiclient.discovery import build
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        from google.auth.transport.requests import Request
         creds = None
         if os.path.exists("token.pickle"):
             with open("google-token.pickle", "rb") as token:
