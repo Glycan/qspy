@@ -1,14 +1,13 @@
 import json
 from datetime import date as Date, timedelta as TimeDelta
-from typing import Tuple, Sequence, TypeVar, Mapping, Union, Optional, List, Container
+from typing import Tuple, Sequence, Mapping, Union, Optional, List
 import pandas as pd
 from pandas import Timestamp as TS
 from oauthlib.oauth2 import MobileApplicationClient
 from requests_oauthlib import OAuth2Session
-from toolz import compose, pipe, juxt, first, last, concat, curry, reduce
-from toolz.curried import compose_left, get, groupby
+from toolz import compose, pipe, juxt, first, last, curry
+from toolz.curried import get, groupby
 from toolz.curried import map  # pylint: disable=redefined-builtin
-from lenses import lens
 
 # TO DO: refresh tokens
 # TO DO: fix cache merging
@@ -100,39 +99,42 @@ class Fitbit:
             *date_range
         )
         # doesn't include the last date!
-        response = self.session.get(url)
+        response = self.session.get(url)  # type: ignore
         if not response.ok:
             print(response.json())
         result: RawData = response.json()["sleep"]
         return result
 
-    def get_data(self, start_str: str, stop_str: str) -> pd.Series:
+    def get_data(
+        self, start_str: str, stop_str: str, fetch: bool = True, fill: bool = False
+    ) -> pd.Series:
+        if not fetch:
+            return self.cache.iloc[
+                (self.cache.index >= TS(start_str)) & (self.cache.index < TS(stop_str))
+            ]
         # date_range includes the last date, but the fitbit API doesn't
         requested_dates: Sequence[TS] = pd.date_range(start_str, stop_str)
         # don't check the cache for the last one!
         needed_dates = sorted(list(set(requested_dates[:-1]) - set(self.cache.index)))
         needed_ranges = find_ranges(needed_dates)
-        initial_header = pd.DataFrame(columns=HEADER)
 
-        def collect_data(
-            data_so_far: pd.DataFrame, date_range: Tuple[Date, Date]
-        ) -> pd.DataFrame:
-            str_range = tuple(map(Date.isoformat, date_range))
+        def collect_data(date_range: Tuple[Date, Date]) -> pd.DataFrame:
+            str_range: Tuple[str, str] = tuple(map(Date.isoformat, date_range))
             raw_data = self.fetch_raw_data_for_range(str_range)
-            new_data = parsed_data(raw_data)
-            return pd.merge_ordered(
-                data_so_far, new_data, left_by="index", fill_method="ffil"
-            )
+            new_data = parsed_data(raw_data)  # add nap filtering here
+            return new_data
 
-        collected_df = reduce(collect_data, needed_ranges, initial_header)
-        missing_dates = set(needed_dates) - set(collected_df.index())
-        row_fill = [None] * len(HEADER[1:])
-        filled_matrix = [([date] + row_fill) for date in missing_dates]
-        filled_df = pd.DataFrame(filled_matrix, columns=HEADER)
-        del self.cache
-        self.cache = collected_df.merge(filled_df, how="outer")
+        collected_df = pd.concat(map(collect_data, needed_ranges))
+        if fill:
+            missing_dates = set(needed_dates) - set(collected_df.index)
+            row_fill = [None] * len(HEADER[1:])
+            matrix_fill = [([date] + row_fill) for date in missing_dates]
+            df_fill = pd.DataFrame(matrix_fill, columns=HEADER, index=missing_dates)
+            collected_df = pd.concat([collected_df, df_fill])
+        self.cache = pd.concat(
+            [self.cache, collected_df], sort=False
+        ).sort_index()
         self.cache.to_csv("sleep.csv")
-        breakpoint()
         return self.cache[requested_dates[0] : requested_dates[-1]]
 
 

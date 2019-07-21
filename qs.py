@@ -1,19 +1,16 @@
 from pdb import pm
-from warnings import filterwarnings
+from itertools import zip_longest
+from typing import Tuple, Iterator
 import pandas as pd
-from typeguard import TypeChecker, TypeWarning
+from pandas import Timestamp as TS
+from dateutil.parser import parse as parse_dt
+from toolz import curry, pipe, valmap
+from toolz.curried import map, drop  # pylint: disable=redefined-builtin
+from scipy.stats import ttest_ind
+from statsmodels.stats.power import TTestIndPower
 import fitbit
-#import sheets
-#
-filterwarnings("always", category=TypeWarning)
-if 1: #with TypeChecker(["fitbit"]):
-    sleep = fitbit.get_data("2019-04-01", "2019-05-01")
-    sleep = fitbit.get_data("2019-04-01", "2019-04-17")
 
-
-# I'm going to do this is all in an unorganized way right now and make a better layout later 
-
-
+# import sheets
 def find_sleep_times(log: pd.DataFrame) -> pd.Series:
     dup_ts = pd.DataFrame({"content": log["content"], "ts": log.index})
     all_sleeps = dup_ts[log["content"] == "sleep"]
@@ -24,14 +21,39 @@ def find_sleep_times(log: pd.DataFrame) -> pd.Series:
     sleep_times = day_groups.last()["ts"]
     return sleep_times
 
-def test_find_sleep_times():
+
+def test_find_sleep_times() -> None:
     test_data = sheets.read_log("test-data/sleep_times_log.csv")
     expected = pd.Series(
-    	pd.to_datetime(["2019-05-11 00:30", "2019-05-11 23:33", "2019-05-13 23:21"]),
-    	index=pd.to_datetime(["2019-05-10", "2019-05-11", "2019-05-13"])
+        pd.to_datetime(["2019-05-11 00:30", "2019-05-11 23:33", "2019-05-13 23:21"]),
+        index=pd.to_datetime(["2019-05-10", "2019-05-11", "2019-05-13"]),
     )
     assert (find_sleep_times(test_data) == expected).all()
 
 
-#log = sheets.get_data()
+# log = sheets.get_data()
+if __name__ == "__main__":
+    sleep = fitbit.get_data("2019-03-22", "2019-04-27")
+    data: Iterator[Tuple[str]] = pipe(
+        open("modafinil-data"),
+        map(curry(str.split)(maxsplit=3)),
+        lambda rows: zip_longest(*rows, fillvalue=""),
+    )
+    dates = pipe(next(data), map(parse_dt), map(TS), pd.Series)
+    parsed_data = {
+        "number": pipe(next(data), map(drop(1)), map("".join), map(float)),
+        "treatment": map("A".__eq__, next(data)),
+        "times": next(data),
+    }
+    modafinil_df = pd.DataFrame(valmap(curry(pd.Series, index=dates), parsed_data))
+    new_sleep = sleep.copy()
 
+    merged = new_sleep.merge(modafinil_df, right_index=True, left_index=True)
+    treated = merged[merged.treatment].efficiency
+    untreated = merged[~merged.treatment].efficiency
+    p_val = ttest_ind(treated, untreated)
+    mean_diff = (
+        sum(treated) / len(treated) - sum(untreated) / len(untreated)
+    ) / merged.efficiency.std()
+    # now get this to actualy work and abstract it so it works with arbitrary columns, depression, etc
+    num = TTestIndPower().solve_power(0.8, power=0.95, nobs1=None, alpha=0.2)
