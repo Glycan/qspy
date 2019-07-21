@@ -9,8 +9,6 @@ from toolz import compose, pipe, juxt, first, last, curry
 from toolz.curried import get, groupby
 from toolz.curried import map  # pylint: disable=redefined-builtin
 
-# TO DO: refresh tokens
-# TO DO: fix cache merging
 # TO DO: clean data (remove naps, etc)
 # TO DO: paginate requests
 
@@ -23,9 +21,30 @@ if DEBUG:
 RawDateData = Mapping[str, Union[str, Mapping]]
 RawData = List[RawDateData]
 
+# these are pure
+
+# helper functions for deciding what ranges to query for
+def offset_between_index_and_ts(index_and_ts: Tuple[int, TS]) -> int:
+    index, ts = index_and_ts
+    return index - ts.date().toordinal()
+
+
+def find_ranges(seq: Sequence[TS]) -> Sequence[Tuple[TS, TS]]:
+    # consecutive dates have the same offset from their index
+    ranges = pipe(
+        seq,
+        enumerate,  # -> Iterator[Tuple[int, TS]]
+        groupby(offset_between_index_and_ts),  # -> Dict[int, List[Tuple[int, TS]]]
+        dict.values,  # -> Iterator[List[Tuple[int, TS]]]
+        map(map(last)),  # -> Iterator[Iterator[TS]]
+        map(list),  # -> Iterator[List[TS]]
+        map(juxt(first, last)),  # -> Iterator[Tuple[Ts, Ts]]
+        list,  # -> List[Tuple[Ts,Ts]]
+    )
+    return ranges
+
 
 # helper functions for parsing the fitbit API response
-# these are pure
 
 
 def start_ts_parsed_from_raw_data(raw_data: RawDateData) -> TS:
@@ -82,7 +101,7 @@ class Fitbit:
         client = MobileApplicationClient(client_id="22DGXL")
         self.session = OAuth2Session(client=client, scope=["sleep"])
         try:
-            self.session.token = json.load(open(".fitbit-token"))
+            self.session.token = json.load(open("../secrets/fitbit-token"))
         except IOError:
             auth_base = "https://www.fitbit.com/oauth2/authorize"
             expiry = "31536000"
@@ -90,7 +109,7 @@ class Fitbit:
             print(f"Visit this page in your browser: \n{auth_url}")
             callback_url = input("Paste URL you get back here: ")
             self.session.token_from_fragment(callback_url)
-            json.dump(self.session.token, open(".fitbit-token", "w"))
+            json.dump(self.session.token, open("../secrets/fitbit-token", "w"))
 
     # this is unsafe
     def fetch_raw_data_for_range(self, date_range: Tuple[str, str]) -> RawData:
@@ -131,33 +150,9 @@ class Fitbit:
             matrix_fill = [([date] + row_fill) for date in missing_dates]
             df_fill = pd.DataFrame(matrix_fill, columns=HEADER, index=missing_dates)
             collected_df = pd.concat([collected_df, df_fill])
-        self.cache = pd.concat(
-            [self.cache, collected_df], sort=False
-        ).sort_index()
+        self.cache = pd.concat([self.cache, collected_df], sort=False).sort_index()
         self.cache.to_csv("sleep.csv")
         return self.cache[requested_dates[0] : requested_dates[-1]]
-
-
-# these are also pure
-# helper functions for deciding what ranges to query for
-def offset_between_index_and_ts(index_and_ts: Tuple[int, TS]) -> int:
-    index, ts = index_and_ts
-    return index - ts.date().toordinal()
-
-
-def find_ranges(seq: Sequence[TS]) -> Sequence[Tuple[TS, TS]]:
-    # consecutive dates have the same offset from their index
-    ranges = pipe(
-        seq,
-        enumerate,  # -> Iterator[Tuple[int, TS]]
-        groupby(offset_between_index_and_ts),  # -> Dict[int, List[Tuple[int, TS]]]
-        dict.values,  # -> Iterator[List[Tuple[int, TS]]]
-        map(map(last)),  # -> Iterator[Iterator[TS]]
-        map(list),  # -> Iterator[List[TS]]
-        map(juxt(first, last)),  # -> Iterator[Tuple[Ts, Ts]]
-        list,  # -> List[Tuple[Ts,Ts]]
-    )
-    return ranges
 
 
 fitbit = Fitbit()

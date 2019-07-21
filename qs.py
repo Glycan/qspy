@@ -11,6 +11,7 @@ from statsmodels.stats.power import TTestIndPower
 import fitbit
 
 # import sheets
+
 def find_sleep_times(log: pd.DataFrame) -> pd.Series:
     dup_ts = pd.DataFrame({"content": log["content"], "ts": log.index})
     all_sleeps = dup_ts[log["content"] == "sleep"]
@@ -22,20 +23,10 @@ def find_sleep_times(log: pd.DataFrame) -> pd.Series:
     return sleep_times
 
 
-def test_find_sleep_times() -> None:
-    test_data = sheets.read_log("test-data/sleep_times_log.csv")
-    expected = pd.Series(
-        pd.to_datetime(["2019-05-11 00:30", "2019-05-11 23:33", "2019-05-13 23:21"]),
-        index=pd.to_datetime(["2019-05-10", "2019-05-11", "2019-05-13"]),
-    )
-    assert (find_sleep_times(test_data) == expected).all()
-
-
-# log = sheets.get_data()
 if __name__ == "__main__":
     sleep = fitbit.get_data("2019-03-22", "2019-04-27")
     data: Iterator[Tuple[str]] = pipe(
-        open("modafinil-data"),
+        open("data/modafinil-data"),
         map(curry(str.split)(maxsplit=3)),
         lambda rows: zip_longest(*rows, fillvalue=""),
     )

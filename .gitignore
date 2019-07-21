@@ -1,11 +1,3 @@
-credentials.json
-google-token.pickle
-log.csv
-log.csv.bkp
-sleep.csv
-sleep.csv.bkp
-.fitbit-token
+data
 .mypy_cache/
-.qs.py.kak.cRgBoH
 __pycache__/
-modafinil-notes
