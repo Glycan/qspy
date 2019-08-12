@@ -1,11 +1,13 @@
 from pdb import pm
 from itertools import zip_longest
-from typing import Tuple, Iterator
+from typing import Tuple, Iterator, Sequence
+from statistics import mean
 import pandas as pd
 from pandas import Timestamp as TS
 from dateutil.parser import parse as parse_dt
-from toolz import curry, pipe, valmap
+from toolz import curry, pipe, compose, identity
 from toolz.curried import map, drop  # pylint: disable=redefined-builtin
+from toolz.sandbox import unzip as transpose
 from scipy.stats import ttest_ind
 from statsmodels.stats.power import TTestIndPower
 import fitbit
@@ -23,28 +25,82 @@ def find_sleep_times(log: pd.DataFrame) -> pd.Series:
     return sleep_times
 
 
-if __name__ == "__main__":
-    sleep = fitbit.get_data("2019-03-22", "2019-04-27")
-    data: Iterator[Tuple[str]] = pipe(
+def test(data: Sequence[float], treatment: Sequence[bool]):
+    treated = data[treatment].dropna()
+    untreated = data[~treatment].dropna()
+    pooled_std = (treated.std ** 2 + untreated.std ** 2) ** 0.5
+    effect_size = (mean(treated.std) - mean(untreated.std)) / pooled_std
+    nobs1 = len(treated)
+    nobs2 = len(untreated)
+    ratio = nobs2 / nobs1
+    power_for_alpha = curry(TTestIndPower().power, effect_size, nobs1, ratio)
+    return {
+        "p": ttest_ind(treated, untreated).pvalue,
+        "d": effect_size,
+        "pooled sd": pooled_std,
+        "treated sd": treated.std,
+        "untreated sd": untreated.std,
+        "power for p<.2": power_for_alpha(0.2),
+        "power for p<.05": power_for_alpha(0.05),
+    }
+
+
+row_format = [
+    compose(TS, parse_dt),
+    compose(drop(1), "".join, float),
+    "A".__eq__,
+    identity,
+]
+
+def parsed_row(row):
+    padded_row = row + [""] * (len(row_format) - len(row))
+    return [func(cell) for func, cell in zip(row_format,  padded_row)]
+
+@curry
+def apply(func, arg):
+    return func(arg)
+
+@curry
+def accept_one(func, *arg):
+    return func(arg)
+
+@curry
+def accept_variadic(func, arg):
+    return func(*arg)
+
+def iter_pipe(data, *funcs):
+    map(compose(map), funcs)
+    compose(map, func)
+    [compose(map, func) for func in funcs]
+    apply(compose, [map, func])
+    non_variadic(compose)
+    compose_left(*funcs)(data)
+    map(accept_one(compose), zip(repeat(map), funcs))
+
+
+    
+def modafinil() -> None:
+    dates, _numbers, treatments, _times = pipe(
+        open("data/modafinil-data"),
+        map(curry(str.split)(maxsplit=3)), # list of rows
+        map(curry(zip, row_format)), # Iteratable[Tuple[Callable, str]]
+        map(map(variadic(apply))), # Iterable[Iterable[apply(*Tuple[Callable, str])]]
+        # that is,  Iterable[Iterable[X]]
+
+
+
+    )
+    dates, _numbers, treatments, _times = pipe(
         open("data/modafinil-data"),
         map(curry(str.split)(maxsplit=3)),
-        lambda rows: zip_longest(*rows, fillvalue=""),
+        map(parsed_row),
+        transpose,
     )
-    dates = pipe(next(data), map(parse_dt), map(TS), pd.Series)
-    parsed_data = {
-        "number": pipe(next(data), map(drop(1)), map("".join), map(float)),
-        "treatment": map("A".__eq__, next(data)),
-        "times": next(data),
-    }
-    modafinil_df = pd.DataFrame(valmap(curry(pd.Series, index=dates), parsed_data))
-    new_sleep = sleep.copy()
+    return pd.Series(treatments, index=pd.DatetimeIndex(dates, name="dates"))
 
-    merged = new_sleep.merge(modafinil_df, right_index=True, left_index=True)
-    treated = merged[merged.treatment].efficiency
-    untreated = merged[~merged.treatment].efficiency
-    p_val = ttest_ind(treated, untreated)
-    mean_diff = (
-        sum(treated) / len(treated) - sum(untreated) / len(untreated)
-    ) / merged.efficiency.std()
-    # now get this to actualy work and abstract it so it works with arbitrary columns, depression, etc
-    num = TTestIndPower().solve_power(0.8, power=0.95, nobs1=None, alpha=0.2)
+
+if __name__ == "__main__":
+    sleep = fitbit.get_data("2019-03-22", "2019-04-27")
+    modafinil_treatments = modafinil()
+    summary = test(sleep.efficiency, modafinil_treatments)
+    print("; ".join(map("{}={}".format, summary.items())))

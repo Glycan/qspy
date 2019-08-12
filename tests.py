@@ -1,5 +1,7 @@
 import qs
-import sheets 
+import sheets
+
+
 def test_find_sleep_times() -> None:
     test_data = sheets.read_log("test-data/sleep_times_log.csv")
     expected = pd.Series(
@@ -7,4 +9,3 @@ def test_find_sleep_times() -> None:
         index=pd.to_datetime(["2019-05-10", "2019-05-11", "2019-05-13"]),
     )
     assert (qs.find_sleep_times(test_data) == expected).all()
-
